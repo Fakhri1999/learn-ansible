@@ -1,0 +1,1 @@
+apt-get install -y apache2 mysql-server mysql-client python3-pymysql php-curl php-gd php-mbstring php-xml php-xmlrpc php-soap php-intl php-zip php-mysql libapache2-mod-php

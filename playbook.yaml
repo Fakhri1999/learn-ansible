@@ -1,0 +1,112 @@
+- name: Kuis
+  hosts: server
+  become: yes
+  tasks:
+    - name: Updating repo
+      apt:
+        update_cache: yes
+
+    - name: install required package
+      apt:
+        name: "{{ item }}"
+      with_items:
+        - mysql-server
+        - mysql-client
+        - python3-pymysql
+        - php-curl
+        - php-gd
+        - php-mbstring
+        - php-xml
+        - php-xmlrpc
+        - php-soap
+        - php-intl
+        - php-zip
+        - php-mysql
+        - libapache2-mod-php
+
+    - name: Run apache service
+      service:
+        name: apache2
+        state: started
+
+    - name: Run mysql service
+      service:
+        name: mysql
+        state: started
+
+    - name: Change the authentication plugin of MySQL root user to mysql_native_password
+      shell: mysql -u root -e 'UPDATE mysql.user SET plugin="mysql_native_password" WHERE user="root" AND host="localhost"'
+      ignore_errors: yes
+
+    - name: Flush Privileges
+      shell: mysql -u root -e 'FLUSH PRIVILEGES'
+      ignore_errors: yes
+
+    - name: create mysql user
+      ignore_errors: yes
+      mysql_user:
+        login_host: "localhost"
+        login_user: "root"
+        login_password: ""
+        name: root
+        password: "123456"
+        state: present
+
+    - name: create mysql database
+      ignore_errors: yes
+      mysql_db:
+        login_host: "localhost"
+        login_user: "root"
+        login_password: "123456"
+        name: wpdb
+        state: present
+
+    - name: Download wordpress file
+      get_url:
+        url: https://wordpress.org/latest.tar.gz
+        dest: /home/ubuntu/latest.tar.gz
+
+    - name: Extract wordpress file
+      shell: cd /home/ubuntu && tar -xf latest.tar.gz
+
+    - name: Enable the Apache2 module rewrite
+      apache2_module:
+        state: present
+        name: rewrite
+
+    - name: Disable the Apache2 module php old
+      apache2_module:
+        state: absent
+        name: php*
+
+    - name: Enable the Apache2 module php 7
+      apache2_module:
+        state: present
+        name: php7.4
+
+    - name: Copy modified apache2 config
+      copy:
+        src: ./000-default.conf
+        dest: /etc/apache2/sites-available/000-default.conf
+
+    - name: Copy modified wp-config
+      copy:
+        src: ./wp-config.php
+        dest: /home/ubuntu/wordpress/wp-config.php
+
+    - name: Change owner wordpress directory
+      shell: chown -R ubuntu:www-data /home/ubuntu/wordpress
+
+    - name: Add user ubuntu to www-data group
+      shell: usermod -aG www-data ubuntu
+
+    - name: Change permission access (1)
+      shell: find /home/ubuntu/wordpress/ -type d -exec chmod 775 {} \;
+
+    - name: Change permission access (2)
+      shell: find /home/ubuntu/wordpress/ -type f -exec chmod 664 {} \;
+
+    - name: Restart apache service
+      service:
+        name: apache2
+        state: restarted
